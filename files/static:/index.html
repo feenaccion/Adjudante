@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Clashcourse — build a timetable with no clashes</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<div class="app">
+  <header class="top">
+    <div class="brand">
+      <h1>Clash<span class="amber-underline">course</span></h1>
+      <div class="tag">Paste in every possible time for each class. Get back the timetable with the fewest days on campus — or the smallest gaps.</div>
+    </div>
+  </header>
+
+  <div class="layout">
+    <div>
+      <div class="panel">
+        <h2>Your classes</h2>
+        <div id="courseList"></div>
+        <button class="add-course-btn" id="addCourseBtn">+ Add a course</button>
+      </div>
+      <div class="panel">
+        <button class="generate-btn" id="generateBtn">Generate timetables</button>
+        <div class="status" id="statusMsg"></div>
+      </div>
+    </div>
+
+    <div id="resultsArea">
+      <div class="panel">
+        <div class="empty-note">Add your courses and their possible class times on the left, then hit <b>Generate timetables</b>. Results will appear here.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="/app.js"></script>
+</body>
+</html>
