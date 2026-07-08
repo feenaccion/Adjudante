@@ -7,9 +7,28 @@ one option per component. Returns the best timetable by two metrics:
 fewest days on campus, and smallest total gap time between classes.
 """
 
+import os
+
 from flask import Flask, request, jsonify, send_from_directory
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 
 app = Flask(__name__, static_folder="static", static_url_path="")
+
+# --- Security hardening -----------------------------------------------------
+
+# Cap request body size so nobody can POST a huge payload to eat memory/bandwidth.
+app.config["MAX_CONTENT_LENGTH"] = 1 * 1024 * 1024  # 1 MB
+
+# Basic rate limiting — the search is CPU-intensive, so this stops one visitor
+# from spamming the endpoint and slowing the app down for everyone else.
+limiter = Limiter(get_remote_address, app=app, default_limits=["30 per minute"])
+
+# Input caps enforced before the search runs at all, not just once it's inside
+# the (already-capped) backtracking search.
+MAX_COURSES = 20
+MAX_COMPONENTS_PER_COURSE = 10
+MAX_OPTIONS_PER_COMPONENT = 15
 
 DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
 
@@ -21,6 +40,61 @@ def to_min(t: str) -> int:
     """'HH:MM' -> minutes since midnight."""
     h, m = t.split(":")
     return int(h) * 60 + int(m)
+
+
+def validate_request_shape(data):
+    """Structural validation of the incoming JSON, run before any real work.
+
+    Returns an error string if the payload is malformed or oversized,
+    otherwise None.
+    """
+    if not isinstance(data, dict):
+        return "Invalid request body."
+
+    courses = data.get("courses")
+    if not isinstance(courses, list):
+        return "\"courses\" must be a list."
+    if len(courses) > MAX_COURSES:
+        return f"Too many courses (max {MAX_COURSES})."
+
+    for course in courses:
+        if not isinstance(course, dict):
+            return "Each course must be an object."
+        if not isinstance(course.get("name"), str):
+            return "Each course needs a \"name\" string."
+
+        components = course.get("components", [])
+        if not isinstance(components, list):
+            return f'"{course.get("name")}" has an invalid components list.'
+        if len(components) > MAX_COMPONENTS_PER_COURSE:
+            return f'"{course.get("name")}" has too many components (max {MAX_COMPONENTS_PER_COURSE}).'
+
+        for comp in components:
+            if not isinstance(comp, dict):
+                return "Each component must be an object."
+            options = comp.get("options", [])
+            if not isinstance(options, list):
+                return f'"{comp.get("name")}" has an invalid options list.'
+            if len(options) > MAX_OPTIONS_PER_COMPONENT:
+                return f'"{comp.get("name")}" has too many time options (max {MAX_OPTIONS_PER_COMPONENT}).'
+
+            for slot in options:
+                if not isinstance(slot, dict):
+                    return "Each time option must be an object."
+                if slot.get("day") not in DAYS:
+                    return f'Invalid day "{slot.get("day")}" — must be one of {DAYS}.'
+                for field in ("start", "end"):
+                    val = slot.get(field)
+                    if not isinstance(val, str) or ":" not in val:
+                        return f'Invalid "{field}" time format — expected "HH:MM".'
+                    try:
+                        h, m = val.split(":")
+                        if not (0 <= int(h) <= 23 and 0 <= int(m) <= 59):
+                            raise ValueError
+                    except ValueError:
+                        return f'Invalid "{field}" time value — expected "HH:MM".'
+
+    return None
 
 
 def generate_timetables(courses):
@@ -126,12 +200,21 @@ def index():
 
 
 @app.route("/api/generate", methods=["POST"])
+@limiter.limit("30 per minute")
 def api_generate():
-    data = request.get_json(force=True) or {}
-    courses = data.get("courses", [])
-    result = generate_timetables(courses)
+    data = request.get_json(silent=True)
+    error = validate_request_shape(data)
+    if error:
+        return jsonify({"ok": False, "error": error}), 400
+
+    result = generate_timetables(data["courses"])
     return jsonify(result)
 
 
 if __name__ == "__main__":
-    app.run(debug=True, port=5000)
+    # debug=True is fine for local testing (python3 app.py) since production
+    # runs via `gunicorn app:app`, which never executes this block at all.
+    # Kept behind an env var anyway so it can't accidentally be left on if
+    # someone ever does run this file directly on a real server.
+    debug_mode = os.environ.get("FLASK_DEBUG", "false").lower() == "true"
+    app.run(debug=debug_mode, port=5000)
