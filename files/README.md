@@ -1,9 +1,9 @@
-# Clashcourse
+# Adjudante
 
-A small tool for building a clash-free university timetable. Enter every
-possible time each of your classes runs, and it finds the combinations that
-don't overlap — then shows you the one with the fewest days on campus, and
-the one with the smallest gaps between classes.
+I created Adjudante to help build my university timetable for me, without having to worry about clashes,
+being in class every day or having massive breaks between classes. To use Adjudante, simply copy and paste
+in all of the possible timeslots for your classes and let it create timetable options for you ensuring no clashes
+and a schedule that suits YOUR time. 
 
 ## Stack
 
